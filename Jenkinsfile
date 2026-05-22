@@ -42,7 +42,7 @@ pipeline {
         stage('Deploy to Tomcat') {
             steps {
 
-                sshagent(['ubuntu']) {
+                sshagent(['generated-id']) {
 
                     sh """
                         set -e
