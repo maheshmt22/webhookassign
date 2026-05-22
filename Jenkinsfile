@@ -7,9 +7,9 @@ pipeline {
     }
 
     environment {
-        SERVER_IP = '54.159.31.22'
+        SERVER_IP   = '54.159.31.22'
         SERVER_USER = 'ubuntu'
-        TOMCAT_DIR = '/opt/tomcat/webapps'
+        TOMCAT_DIR  = '/opt/tomcat/webapps'
     }
 
     stages {
@@ -17,31 +17,23 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 git branch: 'main',
-                    url: 'https://github.com/maheshmt22/webhookassign.git'
+                url: 'https://github.com/maheshmt22/webhookassign.git'
             }
         }
 
         stage('Build Application') {
             steps {
-
                 dir('devopscode') {
 
                     sh 'mvn clean package -DskipTests'
 
                     script {
-
                         env.WAR_FILE = sh(
-                            script: "ls target/*.war",
+                            script: "basename target/*.war",
                             returnStdout: true
                         ).trim()
 
-                        env.WAR_NAME = sh(
-                            script: "basename ${env.WAR_FILE}",
-                            returnStdout: true
-                        ).trim()
-
-                        echo "WAR File Path: ${env.WAR_FILE}"
-                        echo "WAR Name: ${env.WAR_NAME}"
+                        echo "WAR Name: ${WAR_FILE}"
                     }
                 }
             }
@@ -50,44 +42,33 @@ pipeline {
         stage('Deploy to Tomcat') {
             steps {
 
-                sshagent(credentials: ['tomcat-ssh-key']) {
+                sshagent(['ubuntu']) {
 
                     sh """
                         set -e
 
-                        echo "Deploying WAR: ${WAR_NAME}"
-
                         echo "Copying WAR to server..."
 
                         scp -o StrictHostKeyChecking=no \
-                        ${WAR_FILE} \
+                        devopscode/target/${WAR_FILE} \
                         ${SERVER_USER}@${SERVER_IP}:/tmp/
 
-                        echo "Deploying to Tomcat..."
+                        echo "Deploying WAR on Tomcat server..."
 
                         ssh -o StrictHostKeyChecking=no \
-                        ${SERVER_USER}@${SERVER_IP} '
+                        ${SERVER_USER}@${SERVER_IP} << EOF
 
-                            set -e
+                            sudo systemctl stop tomcat
 
-                            echo "Removing old deployment..."
+                            sudo rm -rf ${TOMCAT_DIR}/tomcat-demo*
 
-                            sudo rm -rf ${TOMCAT_DIR}/devopscode*
+                            sudo mv /tmp/${WAR_FILE} ${TOMCAT_DIR}/
 
-                            echo "Moving new WAR..."
-
-                            sudo mv /tmp/${WAR_NAME} ${TOMCAT_DIR}/
-
-                            echo "Restarting Tomcat..."
-
-                            sudo systemctl restart tomcat
-
-                            sleep 10
+                            sudo systemctl start tomcat
 
                             sudo systemctl status tomcat --no-pager
-                        '
 
-                        echo "Deployment completed successfully!"
+                        EOF
                     """
                 }
             }
