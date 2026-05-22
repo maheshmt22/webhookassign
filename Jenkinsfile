@@ -2,79 +2,37 @@ pipeline {
     agent any
 
     tools {
-        jdk 'jdk17'
         maven 'maven3'
-    }
-
-    environment {
-        SERVER_IP   = '54.159.31.22'
-        SERVER_USER = 'ubuntu'
-        TOMCAT_DIR  = '/opt/tomcat/webapps'
+        jdk 'jdk17'
     }
 
     stages {
 
-        stage('Build Application') {
+        stage('Maven Build') {
             steps {
 
                 dir('devopscode') {
 
-                    sh 'mvn clean package -DskipTests'
+                    sh '''
+                        mvn clean package
 
-                    script {
-                        env.WAR_FILE = sh(
-                            script: "basename target/*.war",
-                            returnStdout: true
-                        ).trim()
+                        sudo rm -rf /opt/tomcat/webapps/tomcat-demo
+                        sudo rm -rf /opt/tomcat/webapps/tomcat-demo.war
 
-                        echo "WAR File: ${WAR_FILE}"
-                    }
+                        cp target/*.war /opt/tomcat/webapps/
+                    '''
                 }
             }
         }
 
-        stage('Deploy to Tomcat') {
+        stage('Restart Tomcat Service') {
             steps {
 
-                sshagent(['ubuntu']) {
-
-                    sh """
-                        echo "Copying WAR file..."
-
-                        scp -o StrictHostKeyChecking=no \
-                        devopscode/target/${WAR_FILE} \
-                        ${SERVER_USER}@${SERVER_IP}:/tmp/
-
-                        echo "Deploying application..."
-
-                        ssh -o StrictHostKeyChecking=no \
-                        ${SERVER_USER}@${SERVER_IP} << EOF
-
-                            sudo systemctl stop tomcat
-
-                            sudo rm -rf ${TOMCAT_DIR}/tomcat-demo*
-
-                            sudo mv /tmp/${WAR_FILE} ${TOMCAT_DIR}/
-
-                            sudo systemctl start tomcat
-
-                            sudo systemctl status tomcat --no-pager
-
-                        EOF
-                    """
-                }
+                sh '''
+                    sudo systemctl restart tomcat
+                    sudo systemctl status tomcat --no-pager
+                '''
             }
-        }
-    }
-
-    post {
-
-        success {
-            echo 'Deployment Successful!'
-        }
-
-        failure {
-            echo 'Deployment Failed!'
         }
     }
 }
