@@ -19,7 +19,7 @@ pipeline {
                         sudo rm -rf /opt/tomcat/webapps/tomcat-demo
                         sudo rm -rf /opt/tomcat/webapps/tomcat-demo.war
 
-                        cp target/*.war /opt/tomcat/webapps/
+                        sudo cp target/*.war /opt/tomcat/webapps/
                     '''
                 }
             }
