@@ -11,7 +11,7 @@ pipeline{
 		stage('Maven Build'){
 		steps{
 			sh ''' 
-				cd /home/ubuntu/javacodrohit/devopscode
+				cd /home/ubuntu/javacodrohit/devopscode/
 				mvn clean package
 				sudo rm -rf /opt/tomcat/webapps/tomcat-demo
 				sudo rm -rf /opt/tomcat/webapps/tomcat-demo.war
