@@ -17,7 +17,7 @@ pipeline {
 
         stage('Build') {
             steps {
-                dir('sample-app') {
+                dir('src/main') {
                     sh 'mvn clean package -DskipTests'
                 }
             }
