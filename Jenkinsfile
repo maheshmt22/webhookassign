@@ -1,31 +1,80 @@
-pipeline{
-	agent any
-	stages{
-		stage('Clone'){
-			steps{
-				sh '''
-					git clone https://github.com/maheshmt22/webhookassign.git
-				'''
-			}
-		}
-		stage('Maven Build'){
-		steps{
-			sh ''' 
-				cd /home/ubuntu/javacodrohit/devopscode/
-				mvn clean package
-				sudo rm -rf /opt/tomcat/webapps/tomcat-demo
-				sudo rm -rf /opt/tomcat/webapps/tomcat-demo.war
-				cd target
-				cp *.war /opt/tomcat/webapps/
-			'''
-			}
-		}
-		stage('Restart the tomcat service'){
-		steps{
-			sh ''' 
-				sudo systemctl restart tomcat
-			'''
-			}
-		}
-	}
+pipeline {
+    agent any
+
+    tools {
+        jdk 'jdk17'
+        maven 'maven3'
+    }
+
+    environment {
+        SERVER_IP   = '54.159.31.22'
+        SERVER_USER = 'ubuntu'
+        TOMCAT_DIR  = '/opt/tomcat/webapps'
+    }
+
+    stages {
+
+        stage('Build Application') {
+            steps {
+
+                dir('devopscode') {
+
+                    sh 'mvn clean package -DskipTests'
+
+                    script {
+                        env.WAR_FILE = sh(
+                            script: "basename target/*.war",
+                            returnStdout: true
+                        ).trim()
+
+                        echo "WAR File: ${WAR_FILE}"
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Tomcat') {
+            steps {
+
+                sshagent(['ubuntu']) {
+
+                    sh """
+                        echo "Copying WAR file..."
+
+                        scp -o StrictHostKeyChecking=no \
+                        devopscode/target/${WAR_FILE} \
+                        ${SERVER_USER}@${SERVER_IP}:/tmp/
+
+                        echo "Deploying application..."
+
+                        ssh -o StrictHostKeyChecking=no \
+                        ${SERVER_USER}@${SERVER_IP} << EOF
+
+                            sudo systemctl stop tomcat
+
+                            sudo rm -rf ${TOMCAT_DIR}/tomcat-demo*
+
+                            sudo mv /tmp/${WAR_FILE} ${TOMCAT_DIR}/
+
+                            sudo systemctl start tomcat
+
+                            sudo systemctl status tomcat --no-pager
+
+                        EOF
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+
+        success {
+            echo 'Deployment Successful!'
+        }
+
+        failure {
+            echo 'Deployment Failed!'
+        }
+    }
 }
